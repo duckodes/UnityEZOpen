@@ -1,6 +1,7 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+$gitGlobalUserName = git config --global user.name
 $unityExe = "C:\Program Files\Unity\Hub\Editor\2022.3.44f1\Editor\Unity.exe"
 $projectsFile = Join-Path $PSScriptRoot "Setup.txt"
 
@@ -40,6 +41,18 @@ Get-Content $projectsFile | ForEach-Object {
             }
         }#>
 
+        # 所有人Commit次數
+        $commitInfo = git -C $path log --all --pretty=format:"%an"
+        $commitGrouped = $commitInfo | Group-Object | Sort-Object Count -Descending
+        $commiters = ""
+
+        # 顯示作者和 commit 次數
+        $commitGrouped | ForEach-Object {
+            if ($_.Name -eq $gitGlobalUserName) {
+                $commiters += "{0,-30}{1}`n" -f $_.Name, $_.Count
+            }
+        }
+
         # Unity 版本
         $unityVersion = "未知版本"
         $versionFile = Join-Path $path "ProjectSettings\ProjectVersion.txt"
@@ -74,6 +87,7 @@ Get-Content $projectsFile | ForEach-Object {
             BundleVersion = $bundleVersion
             SubName = $subName
             SubBranch = $subBranch
+            Commiters = $commiters
         }
     }
 }
@@ -118,7 +132,7 @@ $form.Controls.Add($closeBtn)#>
 $yOffset = 10
 foreach ($proj in $projects) {
     $btn = New-Object System.Windows.Forms.Button
-    $text = "$($proj.Name)`nUnity版本：$($proj.UnityVersion)`nBundleVersion：$($proj.BundleVersion)`nGit分支：$($proj.Branch)"# + "`nSubmodule分支($($proj.SubName))：$($proj.SubBranch)"
+    $text = "$($proj.Name)`nUnity版本：$($proj.UnityVersion)`nBundleVersion：$($proj.BundleVersion)`nGit分支：$($proj.Branch)" + "`n$($proj.Commiters)"# + "`nSubmodule分支($($proj.SubName))：$($proj.SubBranch)"
     $lineCount = ($text -split "`n").Count
     $btnHeight = $lineCount * 20 + 10
 
@@ -147,8 +161,9 @@ foreach ($proj in $projects) {
         }
         $form.Close()
     })
-
+    
     $form.Controls.Add($btn)
+
     $yOffset += ($btnHeight + 10)
     # 置中所有按鈕
     $form.Add_Resize({
